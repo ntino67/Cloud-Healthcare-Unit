@@ -14,3 +14,13 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./db/:/docker-entrypoint-initdb.d/:z
+
+  spark:
+    image: bitnami/spark:latest
+    container_name: spark_container
+    restart: no
+    environment:
+      - SPARK_MODE=master
+    ports:
+      - "8080:8080"
+      - "7077:7077"
