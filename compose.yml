@@ -1,11 +1,13 @@
 volumes:
-  postgres-data: {}
+  postgres-data: { }
+  hadoop_namenode: { }
+  hadoop_datanode: { }
 
 services:
   db:
     container_name: postgres_container
-    image: postgres
-    restart: no
+    image: postgres:latest
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -24,3 +26,64 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
       - "127.0.0.1:7077:7077"
+
+  namenode:
+    image: apache/hadoop:3
+    hostname: namenode
+    command: [ "hdfs", "namenode" ]
+    ports:
+      - "0.0.0.0:8020:8020" # Namenode address
+      - "127.0.0.1:9870:9870" # Namenode Web UI
+    volumes:
+      - hadoop_namenode:/hadoop/dfs/name
+    env_file:
+      - ./hadoop/config
+    environment:
+      ENSURE_NAMENODE_DIR: "/tmp/hadoop-root/dfs/name"
+
+  datanode:
+    image: apache/hadoop:3
+    command: [ "hdfs", "datanode" ]
+    volumes:
+      - hadoop_datanode:/hadoop/dfs/data
+    env_file:
+      - ./hadoop/config
+    depends_on:
+      - namenode
+
+  resourcemanager:
+    image: apache/hadoop:3
+    hostname: resourcemanager
+    command: [ "yarn", "resourcemanager" ]
+    ports:
+      - "127.0.0.1:8088:8088"  # Resource Manager Web UI
+      - "127.0.0.1:8032:8032"  # Resource Manager address
+      - "127.0.0.1:8031:8031"  # Resource Manager scheduler address
+    env_file:
+      - ./hadoop/config
+    volumes:
+      - ./test.sh:/opt/test.sh
+    depends_on:
+      - namenode
+      - datanode
+
+  nodemanager:
+    image: apache/hadoop:3
+    command: [ "yarn", "nodemanager" ]
+    env_file:
+      - ./hadoop/config
+
+  historyserver:
+    image: apache/hadoop:3
+    hostname: historyserver
+    command: [ "mapred", "historyserver" ]
+    ports:
+      - "127.0.0.1:10020:10020" # History server address
+      - "127.0.0.1:19888:19888" # History Server Web UI
+    env_file:
+      - ./hadoop/config
+    environment:
+      YARN_TIMELINE_SERVICE_HOSTNAME: historyserver
+    depends_on:
+      - resourcemanager
+      - nodemanager
